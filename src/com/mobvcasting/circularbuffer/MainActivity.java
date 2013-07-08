@@ -15,6 +15,7 @@ import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -25,6 +26,7 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ShortBuffer;
@@ -39,10 +41,12 @@ import static com.googlecode.javacv.cpp.opencv_core.*;
 
 public class MainActivity extends Activity implements OnClickListener {
 	
-    private final static String LOG_TAG = "CircularBuffer";
+    private final static String LOGTAG = "CircularBuffer";
 
     private PowerManager.WakeLock mWakeLock;
 	
+    public static final int SECS_TO_BUFFER = 15;
+    
     private int sampleAudioRateInHz = 44100;
     private int imageWidth = 320;
     private int imageHeight = 240;
@@ -58,7 +62,7 @@ public class MainActivity extends Activity implements OnClickListener {
     private Button recordButton;
     private LinearLayout mainLayout;
     
-    private String ffmpeg_link = "/mnt/sdcard/new_stream.flv";
+    private String ffmpeg_link = "/mnt/sdcard/bad_file.flv";
     private volatile FFmpegFrameRecorder recorder;
     long startTime = 0;
     //startTime = System.currentTimeMillis();
@@ -68,7 +72,7 @@ public class MainActivity extends Activity implements OnClickListener {
     private boolean saveFramesInBuffer = true;
     
     
-    private MediaFrame[] mediaFrames = new MediaFrame[15*30];
+    private MediaFrame[] mediaFrames = new MediaFrame[SECS_TO_BUFFER*frameRate];
     private int currentMediaFrame = 0;
     class MediaFrame {
     	
@@ -85,6 +89,14 @@ public class MainActivity extends Activity implements OnClickListener {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.activity_main);
 
+        File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+        File file = new File(path, "circular_video.flv");  
+        ffmpeg_link = file.getAbsolutePath();
+        
+        for (int f = 0; f < mediaFrames.length; f++) {
+        	mediaFrames[f] = new MediaFrame();
+        }
+        
         initLayout();
 
         // Create audio recording thread
@@ -99,7 +111,7 @@ public class MainActivity extends Activity implements OnClickListener {
 
         if (mWakeLock == null) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE); 
-            mWakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, LOG_TAG); 
+            mWakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, LOGTAG); 
             mWakeLock.acquire(); 
         }
     }
@@ -133,37 +145,37 @@ public class MainActivity extends Activity implements OnClickListener {
         
         LinearLayout.LayoutParams layoutParam = new LinearLayout.LayoutParams(imageWidth, imageHeight);        
         mainLayout.addView(cameraView, layoutParam);
-        Log.v(LOG_TAG, "added cameraView to mainLayout");
+        Log.v(LOGTAG, "added cameraView to mainLayout");
     }
 
     private void initRecorder() {
-        Log.w(LOG_TAG,"initRecorder");
+        Log.w(LOGTAG,"initRecorder");
 
         if (yuvIplimage == null) {
         	// Recreated after frame size is set in surface change method
             yuvIplimage = IplImage.create(imageWidth, imageHeight, IPL_DEPTH_8U, 2);
         	//yuvIplimage = IplImage.create(imageWidth, imageHeight, IPL_DEPTH_32S, 2);
 
-            Log.v(LOG_TAG, "IplImage.create");
+            Log.v(LOGTAG, "IplImage.create");
         }
 
         recorder = new FFmpegFrameRecorder(ffmpeg_link, imageWidth, imageHeight, 1);
-        Log.v(LOG_TAG, "FFmpegFrameRecorder: " + ffmpeg_link + " imageWidth: " + imageWidth + " imageHeight " + imageHeight);
+        Log.v(LOGTAG, "FFmpegFrameRecorder: " + ffmpeg_link + " imageWidth: " + imageWidth + " imageHeight " + imageHeight);
 
         recorder.setFormat("flv");
-        Log.v(LOG_TAG, "recorder.setFormat(\"flv\")");
+        Log.v(LOGTAG, "recorder.setFormat(\"flv\")");
         
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
-        Log.v("LOG_TAG", "recorder.setVideoCodec(\"avcodec.AV_CODEC_ID_H264\")");
+        Log.v("LOGTAG", "recorder.setVideoCodec(\"avcodec.AV_CODEC_ID_H264\")");
         
         //recorder.setVideoBitrate(videoBitrate)
         
         recorder.setSampleRate(sampleAudioRateInHz);
-        Log.v(LOG_TAG, "recorder.setSampleRate(sampleAudioRateInHz)");
+        Log.v(LOGTAG, "recorder.setSampleRate(sampleAudioRateInHz)");
 
         // re-set in the surface changed method as well
         recorder.setFrameRate(frameRate);
-        Log.v(LOG_TAG, "recorder.setFrameRate(frameRate)");
+        Log.v(LOGTAG, "recorder.setFrameRate(frameRate)");
     }    
     
     // Do the buffer save
@@ -180,9 +192,12 @@ public class MainActivity extends Activity implements OnClickListener {
             startTime = mediaFrames[currentMediaFrame%mediaFrames.length].timestamp;
 
             for (int f = 0; f < mediaFrames.length; f++) {
-            	yuvIplimage.getByteBuffer().put(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].videoFrame);
-            	recorder.setTimestamp(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].timestamp - startTime);
-            	recorder.record(yuvIplimage);
+            	if (mediaFrames[(currentMediaFrame+f)%mediaFrames.length].videoFrame != null) {
+            		Log.v(LOGTAG,"Adding in frame: " + ((currentMediaFrame+f)%mediaFrames.length));
+            		yuvIplimage.getByteBuffer().put(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].videoFrame);
+            		recorder.setTimestamp(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].timestamp - startTime);
+            		recorder.record(yuvIplimage);
+            	}
             }
         
             // AUDIO
@@ -221,7 +236,7 @@ public class MainActivity extends Activity implements OnClickListener {
         	doBufferSave();
             recordButton.setText("Saving");
         } else {
-            Log.w(LOG_TAG, "Not ready to capture yet..");
+            Log.w(LOGTAG, "Not ready to capture yet..");
         }
     }
     
@@ -247,7 +262,7 @@ public class MainActivity extends Activity implements OnClickListener {
 
             audioData = new short[bufferSize];
 
-            Log.d(LOG_TAG, "audioRecord.startRecording()");
+            Log.d(LOGTAG, "audioRecord.startRecording()");
             audioRecord.startRecording();
 
             // Audio Capture/Encoding Loop
@@ -265,14 +280,14 @@ public class MainActivity extends Activity implements OnClickListener {
                     }
                 }
             }
-            Log.v(LOG_TAG,"AudioThread Finished");
+            Log.v(LOGTAG,"AudioThread Finished");
 
             /* Capture/Encoding finished, release recorder */
             if (audioRecord != null) {
                 audioRecord.stop();
                 audioRecord.release();
                 audioRecord = null;
-                Log.v(LOG_TAG,"audioRecord released");
+                Log.v(LOGTAG,"audioRecord released");
             }
         }
     }
@@ -306,8 +321,8 @@ public class MainActivity extends Activity implements OnClickListener {
 				camera.setPreviewCallback(this);
 				
 	            Camera.Parameters currentParams = camera.getParameters();
-	            Log.v(LOG_TAG,"Preview Framerate: " + currentParams.getPreviewFrameRate());
-	        	Log.v(LOG_TAG,"Preview imageWidth: " + currentParams.getPreviewSize().width + " imageHeight: " + currentParams.getPreviewSize().height);
+	            Log.v(LOGTAG,"Preview Framerate: " + currentParams.getPreviewFrameRate());
+	        	Log.v(LOGTAG,"Preview imageWidth: " + currentParams.getPreviewSize().width + " imageHeight: " + currentParams.getPreviewSize().height);
 	        	
 	        	// Use these values
 	        	imageWidth = currentParams.getPreviewSize().width;
@@ -318,7 +333,7 @@ public class MainActivity extends Activity implements OnClickListener {
 	    		
 	        	
 	        	/*
-				Log.v(LOG_TAG,"Creating previewBuffer size: " + imageWidth * imageHeight * ImageFormat.getBitsPerPixel(currentParams.getPreviewFormat())/8);
+				Log.v(LOGTAG,"Creating previewBuffer size: " + imageWidth * imageHeight * ImageFormat.getBitsPerPixel(currentParams.getPreviewFormat())/8);
 	        	previewBuffer = new byte[imageWidth * imageHeight * ImageFormat.getBitsPerPixel(currentParams.getPreviewFormat())/8];
 				camera.addCallbackBuffer(previewBuffer);
 	            camera.setPreviewCallbackWithBuffer(this);
@@ -328,13 +343,13 @@ public class MainActivity extends Activity implements OnClickListener {
 				previewRunning = true;
 			}
 			catch (IOException e) {
-				Log.v(LOG_TAG,e.getMessage());
+				Log.v(LOGTAG,e.getMessage());
 				e.printStackTrace();
 			}	
         }
 
         public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            Log.v(LOG_TAG,"Surface Changed: width " + width + " height: " + height);
+            Log.v(LOGTAG,"Surface Changed: width " + width + " height: " + height);
 
             // We would do this if we want to reset the camera parameters
             /*
@@ -354,7 +369,7 @@ public class MainActivity extends Activity implements OnClickListener {
     				previewRunning = true;
     			}
     			catch (IOException e) {
-    				Log.e(LOG_TAG,e.getMessage());
+    				Log.e(LOGTAG,e.getMessage());
     				e.printStackTrace();
     			}	
     		}            
@@ -362,8 +377,8 @@ public class MainActivity extends Activity implements OnClickListener {
             
             // Get the current parameters
             Camera.Parameters currentParams = camera.getParameters();
-            Log.v(LOG_TAG,"Preview Framerate: " + currentParams.getPreviewFrameRate());
-        	Log.v(LOG_TAG,"Preview imageWidth: " + currentParams.getPreviewSize().width + " imageHeight: " + currentParams.getPreviewSize().height);
+            Log.v(LOGTAG,"Preview Framerate: " + currentParams.getPreviewFrameRate());
+        	Log.v(LOGTAG,"Preview imageWidth: " + currentParams.getPreviewSize().width + " imageHeight: " + currentParams.getPreviewSize().height);
         	
         	// Use these values
         	imageWidth = currentParams.getPreviewSize().width;
@@ -381,16 +396,19 @@ public class MainActivity extends Activity implements OnClickListener {
     			camera.release();
                 
             } catch (RuntimeException e) {
-            	Log.v(LOG_TAG,e.getMessage());
+            	Log.v(LOGTAG,e.getMessage());
             	e.printStackTrace();
             }
         }
 
         @Override
         public void onPreviewFrame(byte[] data, Camera camera) {
-        	mediaFrames[currentMediaFrame%mediaFrames.length].timestamp = 1000 * System.currentTimeMillis();
-        	mediaFrames[currentMediaFrame%mediaFrames.length].videoFrame = data;
-        	currentMediaFrame++;
+            if (saveFramesInBuffer) {
+            	mediaFrames[currentMediaFrame%mediaFrames.length].timestamp = 1000 * System.currentTimeMillis();
+            	mediaFrames[currentMediaFrame%mediaFrames.length].videoFrame = data;
+            	Log.v(LOGTAG,"Buffered " + currentMediaFrame + " " + (currentMediaFrame%mediaFrames.length));
+            	currentMediaFrame++;            	
+            }
         }
     }
 }
