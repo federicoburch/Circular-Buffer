@@ -5,10 +5,6 @@ import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.ImageFormat;
-import android.graphics.Paint;
-import android.graphics.RectF;
 import android.hardware.Camera;
 import android.hardware.Camera.PreviewCallback;
 import android.media.AudioFormat;
@@ -28,11 +24,7 @@ import android.widget.LinearLayout;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.Buffer;
-import java.nio.ShortBuffer;
 
-import com.example.javacv05streamtest.R;
-import com.googlecode.javacv.FrameRecorder;
 import com.googlecode.javacv.FFmpegFrameRecorder;
 import com.googlecode.javacv.cpp.avcodec;
 import com.googlecode.javacv.cpp.opencv_core.IplImage;
@@ -63,23 +55,19 @@ public class MainActivity extends Activity implements OnClickListener {
     private LinearLayout mainLayout;
     
     private String ffmpeg_link = "/mnt/sdcard/bad_file.flv";
+    private File filePath;
     private volatile FFmpegFrameRecorder recorder;
     long startTime = 0;
-    //startTime = System.currentTimeMillis();
     private IplImage yuvIplimage = null;
-
     
     private boolean saveFramesInBuffer = true;
-    
     
     private MediaFrame[] mediaFrames = new MediaFrame[SECS_TO_BUFFER*frameRate];
     private int currentMediaFrame = 0;
     class MediaFrame {
-    	
     	long timestamp;
     	byte[] videoFrame;
     	short[] audioFrame;
-    	
     }
     
     @Override
@@ -89,9 +77,7 @@ public class MainActivity extends Activity implements OnClickListener {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.activity_main);
 
-        File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
-        File file = new File(path, "circular_video.flv");  
-        ffmpeg_link = file.getAbsolutePath();
+        filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
         
         for (int f = 0; f < mediaFrames.length; f++) {
         	mediaFrames[f] = new MediaFrame();
@@ -129,9 +115,7 @@ public class MainActivity extends Activity implements OnClickListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
     }
-
 
     private void initLayout() {
 
@@ -151,6 +135,10 @@ public class MainActivity extends Activity implements OnClickListener {
     private void initRecorder() {
         Log.w(LOGTAG,"initRecorder");
 
+        File file = new File(filePath, "circular_video_" + System.currentTimeMillis() + ".flv");  
+        ffmpeg_link = file.getAbsolutePath();        
+        Log.v(LOGTAG,"ffmpeg: " + ffmpeg_link);
+        
         if (yuvIplimage == null) {
         	// Recreated after frame size is set in surface change method
             yuvIplimage = IplImage.create(imageWidth, imageHeight, IPL_DEPTH_8U, 2);
@@ -384,7 +372,6 @@ public class MainActivity extends Activity implements OnClickListener {
         	imageWidth = currentParams.getPreviewSize().width;
         	imageHeight = currentParams.getPreviewSize().height;
         	frameRate = currentParams.getPreviewFrameRate();
-        	
         }
 
         @Override
