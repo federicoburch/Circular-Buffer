@@ -88,9 +88,9 @@ public class MainActivity extends Activity implements OnClickListener {
         initLayout();
 
         // Create audio recording thread
-        audioRecordRunnable = new AudioRecordRunnable();
-        audioThread = new Thread(audioRecordRunnable);
-        audioThread.start();
+        //audioRecordRunnable = new AudioRecordRunnable();
+        //audioThread = new Thread(audioRecordRunnable);
+        //audioThread.start();
     }
 
     @Override
@@ -175,50 +175,30 @@ public class MainActivity extends Activity implements OnClickListener {
     	
         try {
             recorder.start();
-        } catch (FFmpegFrameRecorder.Exception e) {
-            e.printStackTrace();
-        }
 
-    
-/*
- * 				// VIDEO
- *             	videoTimestamp = 1000 * (System.currentTimeMillis() - startTime);
+            // Assuming we recorded at least a full buffer full of frames, the currentMediaFrame%length will be the oldest one
+            startTime = mediaFrames[currentMediaFrame%mediaFrames.length].timestamp;
 
-            	// Put the camera preview frame right into the yuvIplimage object
-            	yuvIplimage.getByteBuffer().put(data);
-            	
-                try {
-                	
-                	// Get the correct time
-                    recorder.setTimestamp(videoTimestamp);
-                    
-                    // Record the image into FFmpegFrameRecorder
-                    recorder.record(yuvIplimage);
-
- * 
- * 				// AUDIO
-                    // Changes in this variable may not be picked up despite it being "volatile"
-                    if (recording) {
-                        try {
-                        	// Write to FFmpegFrameRecorder
-                        	Buffer[] buffer = {ShortBuffer.wrap(audioData, 0, bufferReadResult)};                        
-                        	recorder.record(buffer);
-                        } catch (FFmpegFrameRecorder.Exception e) {
-                            Log.v(LOG_TAG,e.getMessage());
-                            e.printStackTrace();
-                        }
-                    }
-*/	
-    	
-            try {
-                recorder.stop();
-                recorder.release();
-            } catch (FFmpegFrameRecorder.Exception e) {
-                e.printStackTrace();
+            for (int f = 0; f < mediaFrames.length; f++) {
+            	yuvIplimage.getByteBuffer().put(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].videoFrame);
+            	recorder.setTimestamp(mediaFrames[(currentMediaFrame+f)%mediaFrames.length].timestamp - startTime);
+            	recorder.record(yuvIplimage);
             }
-            recorder = null;
         
+            // AUDIO
+            /*
+            Buffer[] buffer = {ShortBuffer.wrap(audioData, 0, bufferReadResult)};                        
+			recorder.record(buffer);
+            */	
     	
+            recorder.stop();
+            recorder.release();
+            
+        } catch (FFmpegFrameRecorder.Exception e) {
+        	e.printStackTrace();
+        }
+        recorder = null;
+        
     	// Then start things back up
     	saveFramesInBuffer = true;
         recordButton.setText("Save");
@@ -408,9 +388,9 @@ public class MainActivity extends Activity implements OnClickListener {
 
         @Override
         public void onPreviewFrame(byte[] data, Camera camera) {
-            
         	mediaFrames[currentMediaFrame%mediaFrames.length].timestamp = 1000 * System.currentTimeMillis();
         	mediaFrames[currentMediaFrame%mediaFrames.length].videoFrame = data;
+        	currentMediaFrame++;
         }
     }
 }
