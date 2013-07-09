@@ -135,7 +135,7 @@ public class MainActivity extends Activity implements OnClickListener {
     private void initRecorder() {
         Log.w(LOGTAG,"initRecorder");
 
-        File file = new File(filePath, "circular_video_" + System.currentTimeMillis() + ".flv");  
+        File file = new File(filePath, "circular_video_" + System.currentTimeMillis() + ".mp4");  
         ffmpeg_link = file.getAbsolutePath();        
         Log.v(LOGTAG,"ffmpeg: " + ffmpeg_link);
         
@@ -150,8 +150,8 @@ public class MainActivity extends Activity implements OnClickListener {
         recorder = new FFmpegFrameRecorder(ffmpeg_link, imageWidth, imageHeight, 1);
         Log.v(LOGTAG, "FFmpegFrameRecorder: " + ffmpeg_link + " imageWidth: " + imageWidth + " imageHeight " + imageHeight);
 
-        recorder.setFormat("flv");
-        Log.v(LOGTAG, "recorder.setFormat(\"flv\")");
+        recorder.setFormat("mp4");
+        Log.v(LOGTAG, "recorder.setFormat(\"mp4\")");
         
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
         Log.v("LOGTAG", "recorder.setVideoCodec(\"avcodec.AV_CODEC_ID_H264\")");
@@ -168,6 +168,9 @@ public class MainActivity extends Activity implements OnClickListener {
     
     // Do the buffer save
     public void doBufferSave() {
+        recordButton.setText("Saving");  
+        recordButton.setEnabled(false);
+    	
     	// Stop recording frames
     	saveFramesInBuffer = false;
     	
@@ -222,7 +225,6 @@ public class MainActivity extends Activity implements OnClickListener {
     public void onClick(View v) {
         if (saveFramesInBuffer) {
         	doBufferSave();
-            recordButton.setText("Saving");
         } else {
             Log.w(LOGTAG, "Not ready to capture yet..");
         }
