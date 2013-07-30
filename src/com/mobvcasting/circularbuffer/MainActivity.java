@@ -25,6 +25,8 @@ import android.widget.LinearLayout;
 import java.io.File;
 import java.io.IOException;
 
+import net.bican.wordpress.Wordpress;
+
 import com.googlecode.javacv.FFmpegFrameRecorder;
 import com.googlecode.javacv.cpp.avcodec;
 import com.googlecode.javacv.cpp.opencv_core.IplImage;
@@ -35,6 +37,14 @@ public class MainActivity extends Activity implements OnClickListener {
 	
     private final static String LOGTAG = "CircularBuffer";
 
+	public static String XMLRPC_ENDPOINT = "http://www.mobvcasting.com/wp/xmlrpc.php";
+
+	public static String XMLRPC_USERNAME = "username";
+	public static String XMLRPC_PASSWORD = "password";    
+    
+	Wordpress wordpress;
+
+	
     private PowerManager.WakeLock mWakeLock;
 	
     public static final int SECS_TO_BUFFER = 15;
@@ -56,11 +66,14 @@ public class MainActivity extends Activity implements OnClickListener {
     
     private String ffmpeg_link = "/mnt/sdcard/bad_file.flv";
     private File filePath;
+    private File currentRecordingFile;
+    
     private volatile FFmpegFrameRecorder recorder;
     long startTime = 0;
     private IplImage yuvIplimage = null;
     
     private boolean saveFramesInBuffer = true;
+    
     
     private MediaFrame[] mediaFrames = new MediaFrame[SECS_TO_BUFFER*frameRate];
     private int currentMediaFrame = 0;
@@ -126,6 +139,8 @@ public class MainActivity extends Activity implements OnClickListener {
         recordButton.setOnClickListener(this);
 
         cameraView = new CameraView(this);
+        cameraView.setClickable(true);
+        cameraView.setOnClickListener(this);
         
         LinearLayout.LayoutParams layoutParam = new LinearLayout.LayoutParams(imageWidth, imageHeight);        
         mainLayout.addView(cameraView, layoutParam);
@@ -135,8 +150,9 @@ public class MainActivity extends Activity implements OnClickListener {
     private void initRecorder() {
         Log.w(LOGTAG,"initRecorder");
 
-        File file = new File(filePath, "circular_video_" + System.currentTimeMillis() + ".mp4");  
-        ffmpeg_link = file.getAbsolutePath();        
+        
+        currentRecordingFile = new File(filePath, "circular_video_" + System.currentTimeMillis() + ".mp4");  
+        ffmpeg_link = currentRecordingFile.getAbsolutePath();        
         Log.v(LOGTAG,"ffmpeg: " + ffmpeg_link);
         
         if (yuvIplimage == null) {
@@ -200,6 +216,8 @@ public class MainActivity extends Activity implements OnClickListener {
             recorder.stop();
             recorder.release();
             
+            uploadRecording();
+            
         } catch (FFmpegFrameRecorder.Exception e) {
         	e.printStackTrace();
         }
@@ -229,6 +247,64 @@ public class MainActivity extends Activity implements OnClickListener {
             Log.w(LOGTAG, "Not ready to capture yet..");
         }
     }
+    
+    private void uploadRecording() {
+		// Do the actual publishing in a background thread
+    /*
+		XMLRPCPublisher publisher = new XMLRPCPublisher(this);
+		publisher.setXMLRPCPublisherCallback(callback);
+		publisher.execute(story);
+	*/
+    }
+    
+    public void doActualUpload()
+    {
+    	/*
+    	Log.v(LOGTAG, "Logging into Wordpress: " + xmlRPCUsername + '@' + SocialReporter.XMLRPC_ENDPOINT);
+		Wordpress wordpress = new Wordpress(xmlRPCUsername, xmlRPCPassword, SocialReporter.XMLRPC_ENDPOINT);
+
+		Page page = new Page();
+		page.setTitle(item.getTitle());
+
+		StringBuffer sbBody = new StringBuffer();
+		sbBody.append(item.getDescription());
+
+		ArrayList<MediaContent> mediaContent = item.getMediaContent();
+		for (MediaContent mc : mediaContent)
+		{
+			//String filePath = mc.getFilePathFromLocalUri(socialReporter.applicationContext);
+			//String filePath = mc.getUrl();
+			URI fileUri = new URI(mc.getUrl());
+			Log.v(LOGTAG,"filePath: "+fileUri.getPath());
+			if (fileUri != null)
+			{
+				File f = new File(fileUri.getPath());
+				MediaObject mObj = wordpress.newMediaObject("image/jpeg", f, false);
+
+				if (mObj != null)
+				{
+
+					sbBody.append("\n\n<a href=\"" + mObj.getUrl() + "\">" + mObj.getUrl() + "</a>");
+
+					// This should
+					XmlRpcStruct enclosureStruct = new XmlRpcStruct();
+					enclosureStruct.put("url", mObj.getUrl());
+					enclosureStruct.put("length", f.length());
+					enclosureStruct.put("type", mObj.getType());
+					page.setEnclosure(enclosureStruct);
+
+				}
+			}
+		}
+
+		page.setDescription(sbBody.toString());
+		boolean publish = true;
+
+		String postId = wordpress.newPost(page, publish);
+		Log.v(LOGTAG, "Posted: " + postId);    	
+    	*/
+    }
+    
     
     //---------------------------------------------
     // audio thread, gets and encodes audio data
