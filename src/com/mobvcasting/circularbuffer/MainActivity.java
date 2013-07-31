@@ -10,6 +10,7 @@ import android.hardware.Camera.PreviewCallback;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.PowerManager;
@@ -19,12 +20,20 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 
+import redstone.xmlrpc.XmlRpcFault;
+import redstone.xmlrpc.XmlRpcStruct;
+
+import net.bican.wordpress.MediaObject;
+import net.bican.wordpress.Page;
 import net.bican.wordpress.Wordpress;
 
 import com.googlecode.javacv.FFmpegFrameRecorder;
@@ -39,11 +48,10 @@ public class MainActivity extends Activity implements OnClickListener {
 
 	public static String XMLRPC_ENDPOINT = "http://www.mobvcasting.com/wp/xmlrpc.php";
 
-	public static String XMLRPC_USERNAME = "username";
-	public static String XMLRPC_PASSWORD = "password";    
+	public static String XMLRPC_USERNAME = "";
+	public static String XMLRPC_PASSWORD = "";    
     
 	Wordpress wordpress;
-
 	
     private PowerManager.WakeLock mWakeLock;
 	
@@ -86,6 +94,10 @@ public class MainActivity extends Activity implements OnClickListener {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, 
+                                WindowManager.LayoutParams.FLAG_FULLSCREEN);
         
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.activity_main);
@@ -139,12 +151,17 @@ public class MainActivity extends Activity implements OnClickListener {
         recordButton.setOnClickListener(this);
 
         cameraView = new CameraView(this);
-        cameraView.setClickable(true);
-        cameraView.setOnClickListener(this);
+        //cameraView.setClickable(true);
+        //cameraView.setOnClickListener(this);
+        
         
         LinearLayout.LayoutParams layoutParam = new LinearLayout.LayoutParams(imageWidth, imageHeight);        
         mainLayout.addView(cameraView, layoutParam);
+        
+        //cameraView.requestFocus();
         Log.v(LOGTAG, "added cameraView to mainLayout");
+        
+        
     }
 
     private void initRecorder() {
@@ -216,6 +233,7 @@ public class MainActivity extends Activity implements OnClickListener {
             recorder.stop();
             recorder.release();
             
+            recordButton.setText("Uploading");
             uploadRecording();
             
         } catch (FFmpegFrameRecorder.Exception e) {
@@ -250,60 +268,59 @@ public class MainActivity extends Activity implements OnClickListener {
     
     private void uploadRecording() {
 		// Do the actual publishing in a background thread
-    /*
-		XMLRPCPublisher publisher = new XMLRPCPublisher(this);
-		publisher.setXMLRPCPublisherCallback(callback);
-		publisher.execute(story);
-	*/
+		XMLRPCPublisher publisher = new XMLRPCPublisher();
+		publisher.execute();
     }
     
-    public void doActualUpload()
+    public class XMLRPCPublisher extends AsyncTask<Void, Integer, Void>
     {
-    	/*
-    	Log.v(LOGTAG, "Logging into Wordpress: " + xmlRPCUsername + '@' + SocialReporter.XMLRPC_ENDPOINT);
-		Wordpress wordpress = new Wordpress(xmlRPCUsername, xmlRPCPassword, SocialReporter.XMLRPC_ENDPOINT);
-
-		Page page = new Page();
-		page.setTitle(item.getTitle());
-
-		StringBuffer sbBody = new StringBuffer();
-		sbBody.append(item.getDescription());
-
-		ArrayList<MediaContent> mediaContent = item.getMediaContent();
-		for (MediaContent mc : mediaContent)
-		{
-			//String filePath = mc.getFilePathFromLocalUri(socialReporter.applicationContext);
-			//String filePath = mc.getUrl();
-			URI fileUri = new URI(mc.getUrl());
-			Log.v(LOGTAG,"filePath: "+fileUri.getPath());
-			if (fileUri != null)
-			{
-				File f = new File(fileUri.getPath());
-				MediaObject mObj = wordpress.newMediaObject("image/jpeg", f, false);
-
+    	@Override
+    	protected Void doInBackground(Void... params)
+    	{
+    		try {
+    			
+	        	Log.v(LOGTAG, "Logging into Wordpress: " + XMLRPC_USERNAME + '@' + XMLRPC_ENDPOINT);
+	    		Wordpress wordpress = new Wordpress(XMLRPC_USERNAME, XMLRPC_PASSWORD, XMLRPC_ENDPOINT);
+	
+	    		Page page = new Page();
+	    		page.setTitle("Circular Buffer Post");
+	
+	    		StringBuffer sbBody = new StringBuffer();
+	    		sbBody.append("Here is the video: ");
+	
+				File f = new File(currentRecordingFile.getPath());
+				MediaObject mObj = wordpress.newMediaObject("video/mp4", f, false);
+	
 				if (mObj != null)
 				{
-
 					sbBody.append("\n\n<a href=\"" + mObj.getUrl() + "\">" + mObj.getUrl() + "</a>");
-
-					// This should
-					XmlRpcStruct enclosureStruct = new XmlRpcStruct();
-					enclosureStruct.put("url", mObj.getUrl());
-					enclosureStruct.put("length", f.length());
-					enclosureStruct.put("type", mObj.getType());
-					page.setEnclosure(enclosureStruct);
-
 				}
+	
+	    		page.setDescription(sbBody.toString());
+	    		boolean publish = true;
+	
+	    		String postId = wordpress.newPost(page, publish);
+	    		Log.v(LOGTAG, "Posted: " + postId);    	
+
+			} catch (XmlRpcFault e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (MalformedURLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
-		}
 
-		page.setDescription(sbBody.toString());
-		boolean publish = true;
-
-		String postId = wordpress.newPost(page, publish);
-		Log.v(LOGTAG, "Posted: " + postId);    	
-    	*/
+    		
+			return null;
+    	}
+    	
+    	@Override
+    	protected void onPostExecute(Void param)
+    	{
+    	}    	
+    	
     }
+    
     
     
     //---------------------------------------------
